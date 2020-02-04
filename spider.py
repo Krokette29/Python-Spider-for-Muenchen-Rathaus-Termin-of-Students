@@ -12,6 +12,35 @@ import io
 
 url = "https://www.muenchen.de/rathaus/terminvereinbarung_abh.html?cts=1089339"
 
+
+def check_termin():
+	tds = driver.find_elements(By.TAG_NAME, 'td')
+	for item in tds:
+		if item.text:
+			if 'bookable' in item.get_attribute('class'):
+				print('Find a termin at {}!'.format(time.asctime(time.localtime(time.time()))))
+				print(item.text, item.get_attribute('class'))
+				item.click()
+				return True
+			item.click()
+			
+	time.sleep(1)
+
+	if 'Eingabe der Kontaktdaten' in driver.page_source:
+		print('Find a termin at {}!'.format(time.asctime(time.localtime(time.time()))))        
+		return True
+
+	return False
+
+
+def export(record_num):
+	with open( '.\\output\\page_source_{}.html'.format(record_num), 'w', encoding="utf-8") as f:
+		f.write(driver.page_source)
+
+	with open( '.\\output\\get_cookies_{}.txt'.format(record_num), 'w', encoding="utf-8") as f:
+		f.write(str(driver.get_cookies()))
+
+
 def check():
 	tds = driver.find_elements(By.TAG_NAME, 'td')
 	for item in tds:
@@ -24,53 +53,62 @@ def check():
 	return False
 
 
+def termin_click():
+	pass
+
+
+tic = time.asctime(time.localtime(time.time()))
+
 driver = webdriver.Chrome()
 driver.get(url)
 
-driver.switch_to.frame('appointment')
+record_num = 0
+# main loop
+while True:      
+	# wait for loading complete and switch to frame appointment
+	succ = False
+	while not succ:
+		try:
+			driver.switch_to.frame('appointment')
+			succ = True
+		except:
+			time.sleep(1)
 
-Select(driver.find_element(By.TAG_NAME, 'select')).select_by_value('1')
+	# switch to next step: Standort
+	Select(driver.find_element(By.TAG_NAME, 'select')).select_by_value('1')
 
-button = driver.find_element(By.XPATH, '//*[@id="F00e214c9f52bf4cddab8ebc9bbb11b2b"]/fieldset/input[2]')
-button.click()
+	button = driver.find_element(By.XPATH, '//*[@id="F00e214c9f52bf4cddab8ebc9bbb11b2b"]/fieldset/input[2]')
+	button.click()
 
-while 'appoints' not in driver.page_source:
-    time.sleep(1)
+	# wait for data from KVR
+	while 'appoints' not in driver.page_source:
+		time.sleep(1)
 
-right = True
-count = 0
-while True:
+	refresh = False
+	termin_exist = False
 	
-    time.sleep(1)
-    if check(): break
-    
-    buttons = driver.find_elements(By.CLASS_NAME, 'navButton')
-    if right:
-        for button in buttons:
-            if button.text == '>':
-                button.click()
-                break
-        count += 1
-        if count == 3:
-            right = False
-            count = 0
-    else:
-        for button in buttons:
-            if button.text == '<':
-                button.click()
-                break
-        count += 1
-        if count == 3:
-            right = True
-            count = 0
+	# checking loop
+	while True:            
+		toc = time.asctime(time.localtime(time.time()))
+		if check_termin(): 
+			termin_exist = True
+			break
 
-	# dates = re.findall('\d{4}-\d{2}-\d{2}', txt)
-	# for date in dates:
-	# 	res = re.search(date+'.{2}(.{2})', txt).group(1)
-	# 	if res[1] != ']':
-	# 		print('Find a termin in {date} at {time}'.format(date=date, time=time.asctime(time.localtime(time.time()))))
+		buttons = driver.find_elements(By.CLASS_NAME, 'navButton')
+		for button in buttons:
+			refresh = True
+			if button.text == '>':
+				button.click()
+				print('click button right')
+				refresh = False
+				
+				# export html source and cookies
+				export(record_num)
+				record_num += 1
+				break
+				
+	if termin_exist: break
+	if refresh: driver.refresh()
 
-
-
-with open( '.\\output\\ouput_page_source.txt', 'w', encoding="utf-8") as f:
-	f.write(driver.page_source)
+export('succ')
+termin_click()
